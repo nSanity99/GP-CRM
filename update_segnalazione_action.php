@@ -33,11 +33,12 @@ if ($conn->connect_error) {
     exit;
 }
 
-$sql = "UPDATE segnalazioni SET stato = ?, note_interne = ?, messaggio_admin = ?, data_ultima_modifica = CURRENT_TIMESTAMP WHERE id_segnalazione = ?";
+// Aggiornamento dei dati principali della segnalazione
+$sql = "UPDATE segnalazioni SET stato = ?, note_interne = ?, data_ultima_modifica = CURRENT_TIMESTAMP WHERE id_segnalazione = ?";
 $stmt = $conn->prepare($sql);
 
 if ($stmt) {
-    $stmt->bind_param("sssi", $nuovo_stato, $note_interne, $messaggio_admin, $id_segnalazione);
+    $stmt->bind_param("ssi", $nuovo_stato, $note_interne, $id_segnalazione);
     if ($stmt->execute()) {
         if ($stmt->affected_rows > 0) {
             echo json_encode(['success' => true, 'message' => 'Segnalazione aggiornata con successo.']);
@@ -53,6 +54,16 @@ if ($stmt) {
 } else {
     error_log("Errore DB (prepare) in update_segnalazione_action: " . $conn->error);
     echo json_encode(['success' => false, 'message' => 'Errore di sistema.']);
+}
+
+// Se è stato inserito un nuovo messaggio per l'utente, lo salviamo nella tabella di chat
+if ($messaggio_admin !== '') {
+    $insert = $conn->prepare("INSERT INTO segnalazioni_chat (id_segnalazione, messaggio_admin) VALUES (?, ?)");
+    if ($insert) {
+        $insert->bind_param("is", $id_segnalazione, $messaggio_admin);
+        $insert->execute();
+        $insert->close();
+    }
 }
 
 $conn->close();

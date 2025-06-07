@@ -15,12 +15,13 @@ $username_display = htmlspecialchars($_SESSION['username'] ?? 'N/A');
 // Connessione al DB e recupero delle segnalazioni SOLO di questo utente
 $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
 $mie_segnalazioni = [];
+$chat_messaggi = [];
 $db_error_message = null;
 
 if ($conn->connect_error) {
     $db_error_message = "Impossibile connettersi al database per caricare lo storico.";
 } else {
-    $sql = "SELECT id_segnalazione, titolo, descrizione, area_competenza, data_invio, stato, data_ultima_modifica, messaggio_admin, risposta_utente
+    $sql = "SELECT id_segnalazione, titolo, descrizione, area_competenza, data_invio, stato, data_ultima_modifica
             FROM segnalazioni
             WHERE id_utente_segnalante = ?
             ORDER BY data_invio DESC";
@@ -32,6 +33,26 @@ if ($conn->connect_error) {
     
     if ($result) {
         $mie_segnalazioni = $result->fetch_all(MYSQLI_ASSOC);
+        $result->free();
+
+        // Carica tutti i messaggi associati a queste segnalazioni
+        if (!empty($mie_segnalazioni)) {
+            $ids = array_column($mie_segnalazioni, 'id_segnalazione');
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $types = str_repeat('i', count($ids));
+            $sql_chat = "SELECT id, id_segnalazione, messaggio_admin, risposta_utente, data_messaggio, data_risposta FROM segnalazioni_chat WHERE id_segnalazione IN ($placeholders) ORDER BY data_messaggio";
+            $stmt_chat = $conn->prepare($sql_chat);
+            $stmt_chat->bind_param($types, ...$ids);
+            $stmt_chat->execute();
+            $res_chat = $stmt_chat->get_result();
+            if ($res_chat) {
+                while ($row = $res_chat->fetch_assoc()) {
+                    $chat_messaggi[$row['id_segnalazione']][] = $row;
+                }
+                $res_chat->free();
+            }
+            $stmt_chat->close();
+        }
     } else {
         $db_error_message = "Errore nel caricamento delle tue segnalazioni.";
     }
@@ -138,23 +159,27 @@ if ($conn->connect_error) {
                                 <div class="detail-item">
                                     <strong>Ultimo Aggiornamento:</strong> <?php echo date('d/m/Y H:i', strtotime($s['data_ultima_modifica'])); ?>
                                 </div>
-                                <?php if (!empty($s['messaggio_admin'])): ?>
-                                    <div class="detail-item">
-                                        <strong>Messaggio dall'Amministratore:</strong>
-                                        <p><?php echo nl2br(htmlspecialchars($s['messaggio_admin'])); ?></p>
-                                    </div>
-                                    <?php if (empty($s['risposta_utente'])): ?>
-                                        <form class="detail-item" action="rispondi_a_admin_action.php" method="POST">
-                                            <input type="hidden" name="id_segnalazione" value="<?php echo $s['id_segnalazione']; ?>">
-                                            <textarea name="risposta_utente" required style="width:100%;padding:8px;min-height:80px;"></textarea>
-                                            <button type="submit" class="nav-link-button" style="margin-top:10px;">Invia Risposta</button>
-                                        </form>
-                                    <?php else: ?>
-                                        <div class="detail-item">
-                                            <strong>La tua Risposta:</strong>
-                                            <p><?php echo nl2br(htmlspecialchars($s['risposta_utente'])); ?></p>
+                                <?php if (!empty($chat_messaggi[$s['id_segnalazione']])): ?>
+                                    <?php foreach ($chat_messaggi[$s['id_segnalazione']] as $msg): ?>
+                                        <div class="detail-item" style="border-bottom:1px solid #eee; margin-bottom:10px; padding-bottom:10px;">
+                                            <strong>Messaggio dall'Amministratore:</strong>
+                                            <p><?php echo nl2br(htmlspecialchars($msg['messaggio_admin'])); ?></p>
+                                            <small><?php echo date('d/m/Y H:i', strtotime($msg['data_messaggio'])); ?></small>
+                                            <?php if (empty($msg['risposta_utente'])): ?>
+                                                <form action="rispondi_a_admin_action.php" method="POST" style="margin-top:8px;">
+                                                    <input type="hidden" name="id_messaggio" value="<?php echo $msg['id']; ?>">
+                                                    <textarea name="risposta_utente" required style="width:100%;padding:8px;min-height:80px;"></textarea>
+                                                    <button type="submit" class="nav-link-button" style="margin-top:10px;">Invia Risposta</button>
+                                                </form>
+                                            <?php else: ?>
+                                                <div style="margin-top:6px; padding-left:10px;">
+                                                    <strong>La tua Risposta:</strong>
+                                                    <p><?php echo nl2br(htmlspecialchars($msg['risposta_utente'])); ?></p>
+                                                    <small><?php echo date('d/m/Y H:i', strtotime($msg['data_risposta'])); ?></small>
+                                                </div>
+                                            <?php endif; ?>
                                         </div>
-                                    <?php endif; ?>
+                                    <?php endforeach; ?>
                                 <?php endif; ?>
                             </div>
                         </div>
