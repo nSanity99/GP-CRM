@@ -16,6 +16,7 @@ if ($_SERVER["REQUEST_METHOD"] !== "POST" || !isset($_SESSION['loggedin']) || $_
 $id_segnalazione = filter_input(INPUT_POST, 'id_segnalazione', FILTER_VALIDATE_INT);
 $nuovo_stato = trim(htmlspecialchars($_POST['nuovo_stato'] ?? ''));
 $note_interne = trim(htmlspecialchars($_POST['note_interne'] ?? ''));
+$messaggio_admin = trim($_POST['messaggio_admin'] ?? '');
 
 // Lista degli stati validi
 $stati_validi = ['Inviata', 'In Lavorazione', 'In Attesa di Risposta', 'Conclusa'];
@@ -32,11 +33,11 @@ if ($conn->connect_error) {
     exit;
 }
 
-$sql = "UPDATE segnalazioni SET stato = ?, note_interne = ? WHERE id_segnalazione = ?";
+$sql = "UPDATE segnalazioni SET stato = ?, note_interne = ?, messaggio_admin = ?, data_ultima_modifica = CURRENT_TIMESTAMP WHERE id_segnalazione = ?";
 $stmt = $conn->prepare($sql);
 
 if ($stmt) {
-    $stmt->bind_param("ssi", $nuovo_stato, $note_interne, $id_segnalazione);
+    $stmt->bind_param("sssi", $nuovo_stato, $note_interne, $messaggio_admin, $id_segnalazione);
     if ($stmt->execute()) {
         if ($stmt->affected_rows > 0) {
             echo json_encode(['success' => true, 'message' => 'Segnalazione aggiornata con successo.']);

@@ -20,9 +20,9 @@ $db_error_message = null;
 if ($conn->connect_error) {
     $db_error_message = "Impossibile connettersi al database per caricare lo storico.";
 } else {
-    $sql = "SELECT titolo, descrizione, area_competenza, data_invio, stato, data_ultima_modifica 
-            FROM segnalazioni 
-            WHERE id_utente_segnalante = ? 
+    $sql = "SELECT id_segnalazione, titolo, descrizione, area_competenza, data_invio, stato, data_ultima_modifica, messaggio_admin, risposta_utente
+            FROM segnalazioni
+            WHERE id_utente_segnalante = ?
             ORDER BY data_invio DESC";
     
     $stmt = $conn->prepare($sql);
@@ -101,6 +101,13 @@ if ($conn->connect_error) {
             <div class="app-section-header">
                 <h2>Riepilogo delle tue segnalazioni inviate</h2>
             </div>
+            <?php if (isset($_GET['reply'])): ?>
+                <?php if ($_GET['reply'] === 'success'): ?>
+                    <p style="color: green; font-weight: bold;">Risposta inviata correttamente.</p>
+                <?php elseif ($_GET['reply'] === 'error'): ?>
+                    <p style="color: red; font-weight: bold;">Errore nell'invio della risposta.</p>
+                <?php endif; ?>
+            <?php endif; ?>
 
             <div id="reports-list-container">
                 <?php if ($db_error_message): ?>
@@ -131,6 +138,24 @@ if ($conn->connect_error) {
                                 <div class="detail-item">
                                     <strong>Ultimo Aggiornamento:</strong> <?php echo date('d/m/Y H:i', strtotime($s['data_ultima_modifica'])); ?>
                                 </div>
+                                <?php if (!empty($s['messaggio_admin'])): ?>
+                                    <div class="detail-item">
+                                        <strong>Messaggio dall'Amministratore:</strong>
+                                        <p><?php echo nl2br(htmlspecialchars($s['messaggio_admin'])); ?></p>
+                                    </div>
+                                    <?php if (empty($s['risposta_utente'])): ?>
+                                        <form class="detail-item" action="rispondi_a_admin_action.php" method="POST">
+                                            <input type="hidden" name="id_segnalazione" value="<?php echo $s['id_segnalazione']; ?>">
+                                            <textarea name="risposta_utente" required style="width:100%;padding:8px;min-height:80px;"></textarea>
+                                            <button type="submit" class="nav-link-button" style="margin-top:10px;">Invia Risposta</button>
+                                        </form>
+                                    <?php else: ?>
+                                        <div class="detail-item">
+                                            <strong>La tua Risposta:</strong>
+                                            <p><?php echo nl2br(htmlspecialchars($s['risposta_utente'])); ?></p>
+                                        </div>
+                                    <?php endif; ?>
+                                <?php endif; ?>
                             </div>
                         </div>
                     <?php endforeach; ?>

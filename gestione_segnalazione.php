@@ -22,7 +22,7 @@ if ($conn->connect_error) {
     $db_error_message = "Impossibile connettersi al database.";
 } else {
     // Ordiniamo per stato, mettendo prima quelle aperte, e poi per data
-    $sql = "SELECT id_segnalazione, nome_utente_segnalante, data_invio, titolo, descrizione, area_competenza, stato, note_interne
+    $sql = "SELECT id_segnalazione, nome_utente_segnalante, data_invio, titolo, descrizione, area_competenza, stato, note_interne, messaggio_admin, risposta_utente
             FROM segnalazioni
             ORDER BY
                 CASE stato
@@ -157,6 +157,16 @@ if ($conn->connect_error) {
                                                 <label for="note_interne-<?php echo $s['id_segnalazione']; ?>">Note Interne (visibili solo agli admin):</label>
                                                 <textarea id="note_interne-<?php echo $s['id_segnalazione']; ?>" name="note_interne"><?php echo htmlspecialchars($s['note_interne'] ?? ''); ?></textarea>
                                             </div>
+                                            <div class="form-group">
+                                                <label for="messaggio_admin-<?php echo $s['id_segnalazione']; ?>">Messaggio/Domanda per l'Utente:</label>
+                                                <textarea id="messaggio_admin-<?php echo $s['id_segnalazione']; ?>" name="messaggio_admin"><?php echo htmlspecialchars($s['messaggio_admin'] ?? ''); ?></textarea>
+                                            </div>
+                                            <?php if (!empty($s['risposta_utente'])): ?>
+                                                <div class="form-group">
+                                                    <label>Risposta Utente:</label>
+                                                    <p style="white-space: pre-wrap; border:1px solid #ccc; padding:8px; border-radius:4px; background:#f8f9fa;"><?php echo nl2br(htmlspecialchars($s['risposta_utente'])); ?></p>
+                                                </div>
+                                            <?php endif; ?>
                                             <button type="button" class="nav-link-button update-btn">Aggiorna</button>
                                             <span class="update-feedback" style="margin-left: 10px; color: green; font-weight: bold;"></span>
                                         </form>
@@ -188,6 +198,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const id = form.querySelector('input[name="id_segnalazione"]').value;
             const nuovoStato = form.querySelector('select[name="stato"]').value;
             const noteInterne = form.querySelector('textarea[name="note_interne"]').value;
+            const messaggioAdmin = form.querySelector('textarea[name="messaggio_admin"]').value;
             const feedbackSpan = form.querySelector('.update-feedback');
             
             updateButton.textContent = '...';
@@ -197,6 +208,7 @@ document.addEventListener('DOMContentLoaded', function() {
             formData.append('id_segnalazione', id);
             formData.append('nuovo_stato', nuovoStato);
             formData.append('note_interne', noteInterne);
+            formData.append('messaggio_admin', messaggioAdmin);
 
             fetch('update_segnalazione_action.php', {
                 method: 'POST',
