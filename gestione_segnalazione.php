@@ -16,6 +16,7 @@ $stati_possibili = ['Inviata', 'In Lavorazione', 'In Attesa di Risposta', 'Concl
 // Connessione DB e recupero segnalazioni
 $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
 $segnalazioni = [];
+$chat_messaggi = [];
 $db_error_message = null;
 
 if ($conn->connect_error) {
@@ -38,6 +39,17 @@ if ($conn->connect_error) {
     if ($result) {
         $segnalazioni = $result->fetch_all(MYSQLI_ASSOC);
         $result->free();
+
+        // Recupero dei messaggi di chat per tutte le segnalazioni
+        $chat_messaggi = [];
+        $sql_chat = "SELECT id, id_segnalazione, messaggio_admin, risposta_utente, data_messaggio, data_risposta FROM segnalazioni_chat ORDER BY data_messaggio ASC";
+        $res_chat = $conn->query($sql_chat);
+        if ($res_chat) {
+            while ($row = $res_chat->fetch_assoc()) {
+                $chat_messaggi[$row['id_segnalazione']][] = $row;
+            }
+            $res_chat->free();
+        }
     } else {
         $db_error_message = "Errore nel caricamento delle segnalazioni.";
     }
@@ -141,6 +153,22 @@ if ($conn->connect_error) {
                                     </div>
                                     <div class="detail-box">
                                         <h4>Gestione Interna</h4>
+                                        <?php if (!empty($chat_messaggi[$s['id_segnalazione']])): ?>
+                                            <?php foreach ($chat_messaggi[$s['id_segnalazione']] as $msg): ?>
+                                                <div class="form-group" style="border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:10px;">
+                                                    <strong>Admin:</strong>
+                                                    <p style="white-space: pre-wrap; margin:4px 0;"><?php echo nl2br(htmlspecialchars($msg['messaggio_admin'])); ?></p>
+                                                    <small><?php echo date('d/m/Y H:i', strtotime($msg['data_messaggio'])); ?></small>
+                                                    <?php if (!empty($msg['risposta_utente'])): ?>
+                                                        <div style="margin-top:6px; padding-left:10px;">
+                                                            <strong>Utente:</strong>
+                                                            <p style="white-space: pre-wrap; margin:4px 0;"><?php echo nl2br(htmlspecialchars($msg['risposta_utente'])); ?></p>
+                                                            <small><?php echo date('d/m/Y H:i', strtotime($msg['data_risposta'])); ?></small>
+                                                        </div>
+                                                    <?php endif; ?>
+                                                </div>
+                                            <?php endforeach; ?>
+                                        <?php endif; ?>
                                         <form class="management-form">
                                             <input type="hidden" name="id_segnalazione" value="<?php echo $s['id_segnalazione']; ?>">
                                             <div class="form-group">
@@ -156,6 +184,10 @@ if ($conn->connect_error) {
                                             <div class="form-group">
                                                 <label for="note_interne-<?php echo $s['id_segnalazione']; ?>">Note Interne (visibili solo agli admin):</label>
                                                 <textarea id="note_interne-<?php echo $s['id_segnalazione']; ?>" name="note_interne"><?php echo htmlspecialchars($s['note_interne'] ?? ''); ?></textarea>
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="messaggio_admin-<?php echo $s['id_segnalazione']; ?>">Nuovo Messaggio per l'Utente:</label>
+                                                <textarea id="messaggio_admin-<?php echo $s['id_segnalazione']; ?>" name="messaggio_admin"></textarea>
                                             </div>
                                             <button type="button" class="nav-link-button update-btn">Aggiorna</button>
                                             <span class="update-feedback" style="margin-left: 10px; color: green; font-weight: bold;"></span>
@@ -188,6 +220,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const id = form.querySelector('input[name="id_segnalazione"]').value;
             const nuovoStato = form.querySelector('select[name="stato"]').value;
             const noteInterne = form.querySelector('textarea[name="note_interne"]').value;
+            const messaggioAdmin = form.querySelector('textarea[name="messaggio_admin"]').value;
             const feedbackSpan = form.querySelector('.update-feedback');
             
             updateButton.textContent = '...';
@@ -197,6 +230,7 @@ document.addEventListener('DOMContentLoaded', function() {
             formData.append('id_segnalazione', id);
             formData.append('nuovo_stato', nuovoStato);
             formData.append('note_interne', noteInterne);
+            formData.append('messaggio_admin', messaggioAdmin);
 
             fetch('update_segnalazione_action.php', {
                 method: 'POST',
